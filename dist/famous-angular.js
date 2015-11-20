@@ -1,6 +1,6 @@
 /**
  * famous-angular - Bring structure to your Famo.us apps with the power of AngularJS. Famo.us/Angular integrates seamlessly with existing Angular and Famo.us apps.
- * @version v0.5.0
+ * @version v0.5.2
  * @link https://github.com/Famous/famous-angular
  * @license MPL v2.0
  */
@@ -77,6 +77,7 @@ ngFameApp.provider('$famous', function() {
     "famous/utilities/Timer": famous.utilities.Timer,
     "famous/utilities/Utility": famous.utilities.Utility,
     "famous/views/Deck": famous.views.Deck,
+    "famous/views/DrawerLayout": famous.views.DrawerLayout,
     "famous/views/EdgeSwapper": famous.views.EdgeSwapper,
     "famous/views/FlexibleLayout": famous.views.FlexibleLayout,
     "famous/views/Flipper": famous.views.Flipper,
@@ -196,7 +197,7 @@ ngFameApp.provider('$famous', function() {
   var IS_FA = /^FA\-.*/;
   /**
     Util functions.
-  */ 
+  */
 
   window.$famousUtil = _modules.util = {
     /**
@@ -205,6 +206,7 @@ ngFameApp.provider('$famous', function() {
    * @return {boolean}
    */
     isASurface : function (element) {
+      if(!element[0]) return false;
 
       return IS_A_SURFACE.test(element[0].tagName);
     },
@@ -215,6 +217,8 @@ ngFameApp.provider('$famous', function() {
       @return {boolean}
     */
     isFaElement : function (element) {
+      if(!element[0]) return false;
+
       //short-circuit most common case
       if(IS_FA.test(element[0].tagName)) return true;
 
@@ -254,7 +258,7 @@ ngFameApp.provider('$famous', function() {
         return _modules.util.camelCase(name.replace(PREFIX_REGEXP, ''));
     }
   };
-  
+
   this.$get = function() {
 
     /**
@@ -284,7 +288,6 @@ ngFameApp.provider('$famous', function() {
     return _modules;
   };
 });
-
 
 /**
  * @ngdoc service
@@ -405,7 +408,10 @@ angular.module('famous.angular')
        * considered "enabled" which we do not need.
        */
       var animationHandlers = {
-        enabled: $delegate.enabled
+        enabled: $delegate.enabled,
+        $$removeClassImmediately: $delegate.$$removeClassImmediately,
+        $$addClassImmediately: $delegate.$$addClassImmediately,
+        $$setClassImmediately: $delegate.$$setClassImmediately
       };
 
       angular.forEach(['addClass', 'removeClass'], function(classManipulator) {
@@ -438,7 +444,7 @@ angular.module('famous.angular')
          */
         animationHandlers[classManipulator] = function(element, className, done) {
 
-          $delegate[classManipulator](element, className, done);
+          var promise = $delegate[classManipulator](element, className, done);
           if($famous.util.isFaElement(element)){
             var isolate = _getIsolate(element.scope());
             if ($famous.util.isASurface(element)) {
@@ -468,6 +474,7 @@ angular.module('famous.angular')
               });
             }
           }
+          return promise;
          };
       });
 
@@ -476,7 +483,7 @@ angular.module('famous.angular')
       // and items to remove. Manually loop through both lists.
       animationHandlers.setClass = function(element, add, remove, done) {
 
-        $delegate.setClass(element, add, remove, done);
+        var promise = $delegate.setClass(element, add, remove, done);
 
         if ($famous.util.isASurface(element)) {
           var surface = _getIsolate(element.scope()).renderNode;
@@ -488,6 +495,7 @@ angular.module('famous.angular')
             surface.removeClass(className);
           });
         }
+        return promise;
       };
 
       /**
@@ -817,7 +825,11 @@ angular.module('famous.angular')
       for (var i = 0; i < pipes.length; i++) {
         for (var j = 0; j < targets.length; j++) {
           if (targets[j] !== undefined && pipes[i] !== undefined) {
-              targets[j]._isModifier? targets[j]._object[method](pipes[i]) : targets[j][method](pipes[i]);
+            if (targets[j]._isModifier){
+              targets[j]._object[method](pipes[i]);
+            } else {
+              targets[j][method](pipes[i]);
+            }
           }
         }
       }
@@ -861,7 +873,7 @@ angular.module('famous.angular')
  * @example
  * ```html
  * <fa-modifier
- *   fa-rotate-y="rRotation(t.get())"
+ *   fa-rotate-y="yRotation(t.get())"
  *   fa-translate="translation(t.get())"
  * >
  *   ...
@@ -1320,7 +1332,7 @@ angular.module('famous.angular')
  *     restrict: 'A',
  *     scope: false,
  *     priority: 16,
- *     compile: function(tElement, tAttrs, transclude) {
+ *     compile: function(tElement, tAttrs) {
  *       var Transitionable = $famous['famous/transitions/Transitionable'];
  *       return {
  *         pre: function(scope, element, attrs) {
@@ -1377,7 +1389,7 @@ angular.module('famous.angular')
     return {
       restrict: 'EA',
       scope: true,
-      compile: function (tElement, tAttrs, transclude) {
+      compile: function (tElement, tAttrs) {
         var Transform = $famous['famous/core/Transform'];
         var Transitionable = $famous['famous/transitions/Transitionable'];
         var Easing = $famous['famous/transitions/Easing'];
@@ -1799,7 +1811,7 @@ angular.module('famous.angular')
       transclude: true,
       scope: true,
       restrict: 'EA',
-      compile: function (tElement, tAttrs, transclude) {
+      compile: function (tElement, tAttrs) {
         return {
           pre: function (scope, element, attrs) {
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -1860,7 +1872,7 @@ angular.module('famous.angular')
               evt.stopPropagation();
             });
           },
-          post: function (scope, element, attrs) {
+          post: function (scope, element, attrs, ctrl, transclude) {
 
             var isolate = $famousDecorator.ensureIsolate(scope);
             transclude(scope, function (clone) {
@@ -1904,7 +1916,7 @@ angular.module('famous.angular')
       transclude: true,
       template: '<canvas class="fa-canvas-surface"></canvas>',
       restrict: 'EA',
-      compile: function(tElem, tAttrs, transclude){
+      compile: function(tElem, tAttrs){
         return {
           pre: function(scope, element, attrs){
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -1930,7 +1942,7 @@ angular.module('famous.angular')
             });
                         
           },
-          post: function(scope, element, attrs){
+          post: function(scope, element, attrs, ctrl, transclude){
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             var updateContent = function() {
@@ -2070,7 +2082,7 @@ angular.module('famous.angular')
       restrict: 'E',
       transclude: true,
       scope: true,
-      compile: function(tElem, tAttrs, transclude){
+      compile: function(tElem, tAttrs){
         return  {
           pre: function(scope, element, attrs){
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -2089,7 +2101,7 @@ angular.module('famous.angular')
               }
             );
           },
-          post: function(scope, element, attrs){
+          post: function(scope, element, attrs, ctrl, transclude){
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function(clone) {
@@ -2120,9 +2132,9 @@ angular.module('famous.angular')
       restrict: 'EA',
       priority: 2,
       scope: true,
-      compile: function (tElement, tAttrs, transclude) {
+      compile: function (tElement, tAttrs) {
         return {
-          post: function (scope, element, attrs) {
+          post: function (scope, element, attrs, ctrl, transclude) {
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             var RenderNode = $famous['famous/core/RenderNode'];
@@ -2172,6 +2184,124 @@ angular.module('famous.angular')
 
 /**
  * @ngdoc directive
+ * @name faDrawerLayout
+ * @module famous.angular
+ * @restrict EA
+ * @description
+ * This directive will create a Famo.us DrawerLayout containing
+ * a Content and a Drawer based on the order of its child elements.
+ *  See [https://famo.us/docs/views/DrawerLayout]
+ *
+ * @usage
+ * ```html
+ * <fa-drawer-layout>
+ *   <!-- content rendernode -->
+ *   <!-- drawer rendernode -->
+ * </fa-drawer-layout>
+ * ```
+ * @example
+ * `fa-drawer-layout` is a View that arranges two renderables into a drawer area with a defined size and a content area that fills up the remaining space.
+ *
+ * To use it, declare it in the html and nest 2 renderables.
+ * 
+ *
+ */
+
+angular.module('famous.angular')
+  .directive('faDrawerLayout', ["$famous", "$famousDecorator", function ($famous, $famousDecorator) {
+    return {
+      template: '<div></div>',
+      restrict: 'E',
+      transclude: true,
+      scope: true,
+      compile: function (tElem, tAttrs) {
+        return {
+          pre: function (scope, element, attrs) {
+            var DrawerLayout = $famous["famous/views/DrawerLayout"];
+            var isolate = $famousDecorator.ensureIsolate(scope);
+
+            var options = scope.$eval(attrs.faOptions) || {};
+
+            if (!options.drawerLength) {
+              options.drawerLength = scope.$eval(attrs.faDrawerLength);
+            }
+
+            if (!options.side) {
+              options.side = scope.$eval(attrs.faSide);
+            }
+            switch (options.side) {
+              case 'left':
+                options.side = DrawerLayout.SIDES.LEFT;
+                break;
+              case 'top':
+                options.side = DrawerLayout.SIDES.TOP;
+                break;
+              case 'right':
+                options.side = DrawerLayout.SIDES.RIGHT;
+                break;
+              case 'bottom':
+                options.side = DrawerLayout.SIDES.BOTTOM;
+                break;
+            }
+
+            isolate.renderNode = new DrawerLayout(options);
+            $famousDecorator.addRole('renderable', isolate);
+            isolate.show();
+
+            isolate.toggle = function (overrideOptions) {
+              isolate.renderNode.toggle(overrideOptions || scope.$eval(attrs.faOptions));
+            };
+
+            isolate.open = function (overrideOptions) {
+              isolate.renderNode.open(overrideOptions || scope.$eval(attrs.faOptions));
+            };
+
+            isolate.close = function (overrideOptions) {
+              isolate.renderNode.close(overrideOptions || scope.$eval(attrs.faOptions));
+            };
+
+            var _numberOfChildren = 0;
+
+            $famousDecorator.sequenceWith(
+              scope,
+              function addChild(data) {
+                _numberOfChildren++;
+
+                if (_numberOfChildren === 1) {
+                  isolate.renderNode.content.add(data.renderGate);
+                } else if (_numberOfChildren === 2){
+                  isolate.renderNode.drawer.add(data.renderGate);
+                } else {
+                  throw new Error('fa-drawer-layout can accept no more than 2 children');
+                }
+              },
+              function removeChild(childScopeId) {
+                if (_numberOfChildren === 1) {
+                  isolate.renderNode.content.set({});
+                } else if (_numberOfChildren === 2) {
+                  isolate.renderNode.drawer.set({});
+                }
+
+                _numberOfChildren--;
+              }
+            );
+          },
+          post: function (scope, element, attrs, ctrl, transclude) {
+            var isolate = $famousDecorator.ensureIsolate(scope);
+
+            transclude(scope, function (clone) {
+              element.find('div').append(clone);
+            });
+
+            $famousDecorator.registerChild(scope, element, isolate);
+          }
+        };
+      }
+    };
+  }]);
+
+/**
+ * @ngdoc directive
  * @name faEdgeSwapper
  * @module famous.angular
  * @restrict EA
@@ -2199,7 +2329,7 @@ angular.module('famous.angular')
       priority: 512, //higher than ui-view and ng-include, because if it's lower it will
                      //get recompiled every time those templates change
 
-      compile: function(tElement, tAttrs, transclude){
+      compile: function(tElement, tAttrs){
         var EdgeSwapper = $famous['famous/views/EdgeSwapper'];
         return {
           pre: function(scope, element, attrs){
@@ -2282,7 +2412,7 @@ angular.module('famous.angular')
       restrict: 'E',
       transclude: true,
       scope: true,
-      compile: function (tElem, tAttrs, transclude) {
+      compile: function (tElem, tAttrs) {
         return {
           pre: function (scope, element, attrs) {
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -2335,7 +2465,7 @@ angular.module('famous.angular')
             );
 
           },
-          post: function (scope, element, attrs) {
+          post: function (scope, element, attrs, ctrl, transclude) {
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function (clone) {
@@ -2418,7 +2548,7 @@ angular.module('famous.angular')
         restrict: 'E',
         transclude: true,
         scope: true,
-        compile: function (tElem, tAttrs, transclude) {
+        compile: function (tElem, tAttrs) {
           return {
             pre: function (scope, element, attrs) {
               var isolate = $famousDecorator.ensureIsolate(scope);
@@ -2462,7 +2592,7 @@ angular.module('famous.angular')
                 }
               );
             },
-            post: function (scope, element, attrs) {
+            post: function (scope, element, attrs, ctrl, transclude) {
               var isolate = $famousDecorator.ensureIsolate(scope);
               transclude(scope, function (clone) {
                 element.find('div').append(clone);
@@ -2571,7 +2701,7 @@ angular.module('famous.angular')
       restrict: 'E',
       transclude: true,
       scope: true,
-      compile: function (tElem, tAttrs, transclude) {
+      compile: function (tElem, tAttrs) {
         return  {
           pre: function (scope, element, attrs) {
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -2624,7 +2754,7 @@ angular.module('famous.angular')
             );
 
           },
-          post: function (scope, element, attrs) {
+          post: function (scope, element, attrs, ctrl, transclude) {
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function(clone) {
@@ -2785,7 +2915,7 @@ angular.module('famous.angular')
       restrict: 'E',
       transclude: true,
       scope: true,
-      compile: function (tElem, tAttrs, transclude) {
+      compile: function (tElem, tAttrs) {
         var HeaderFooterLayout = $famous["famous/views/HeaderFooterLayout"];
         var RenderNode = $famous["famous/core/RenderNode"];
         return {
@@ -2833,7 +2963,7 @@ angular.module('famous.angular')
             );
 
           },
-          post: function (scope, element, attrs) {
+          post: function (scope, element, attrs, ctrl, transclude) {
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function (clone) {
@@ -2900,7 +3030,7 @@ angular.module('famous.angular')
       scope: true,
       template: '<div class="fa-image-surface"></div>',
       restrict: 'EA',
-      compile: function (tElem, tAttrs, transclude) {
+      compile: function (tElem, tAttrs) {
         return {
           pre: function (scope, element, attrs) {
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -3322,7 +3452,7 @@ angular.module('famous.angular')
               });
 
               renderNode.on('click', function(event, touchend) {
-                scope.$apply(function() {
+                scope.$evalAsync(function() {
                   clickHandler(scope, {$event: (touchend || event)});
                 });
               });
@@ -3863,7 +3993,7 @@ angular.module('famous.angular')
   <file name="index.html">
   <fa-app ng-controller="ModifierCtrl">
       <fa-modifier fa-opacity=".25" fa-skew="myScopeSkewVariable"
-                   fa-translate="[25, 50, 2]" 
+                   fa-translate="[25, 50, 2]"
                    fa-scale="myScopeFunctionThatReturnsAnArray">
         <!-- Child elements of this fa-modifier will be affected by the values above -->
         <fa-surface>I'm translucent, skewed, and translated</fa-surface>
@@ -4183,7 +4313,7 @@ angular.module('famous.angular')
     <script>
       angular.module('faModifierExampleApp', ['famous.angular'])
           .controller('ModifierCtrl', ['$scope', '$famous', function($scope, $famous) {
-            
+
             var Transform = $famous['famous/core/Transform'];
 
             $scope.skewFunc = function() {
@@ -4233,7 +4363,7 @@ angular.module('famous.angular')
                    fa-size="[100, 100]">
         <fa-surface fa-background-color="'red'"></fa-surface>
       </fa-modifier>
-      
+
       <fa-modifier fa-transform-order="['rotateZ', 'translate']"
                    fa-rotate-z="0.3"
                    fa-translate="[100, 0, 0]"
@@ -4267,7 +4397,7 @@ angular.module('famous.angular')
            <fa-surface fa-background-color="'red'"></fa-surface>
          </fa-modifier>
       </fa-modifier>
-      
+
        <fa-modifier fa-rotate-z=".6">
          <fa-modifier fa-translate="[100, 100]" fa-size="[100, 100]">
            <fa-surface fa-background-color="'blue'"></fa-surface>
@@ -4299,9 +4429,9 @@ angular.module('famous.angular')
       restrict: 'EA',
       priority: 2,
       scope: true,
-      compile: function (tElement, tAttrs, transclude) {
+      compile: function (tElement, tAttrs) {
         return {
-          post: function (scope, element, attrs) {
+          post: function (scope, element, attrs, ctrl, transclude) {
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             var RenderNode = $famous['famous/core/RenderNode'];
@@ -4373,7 +4503,7 @@ angular.module('famous.angular')
 
               if(!transforms.length) return undefined;
               else if (transforms.length === 1) return transforms[0];
-              else return Transform.multiply.apply(this, transforms);
+              else return transforms.reduce(Transform.multiply);
             };
 
             var _alignFn = angular.noop;
@@ -4450,7 +4580,7 @@ angular.module('famous.angular')
 
             $famousDecorator.addRole('renderable',isolate);
             isolate.show();
-            
+
             $famousDecorator.sequenceWith(scope, function(data) {
               isolate.renderNode.add(data.renderGate);
             });
@@ -5348,7 +5478,7 @@ angular.module('famous.angular')
       transclude: true,
       scope: true,
       restrict: 'EA',
-      compile: function(tElement, tAttrs, transclude){
+      compile: function(tElement, tAttrs){
         return {
           pre: function(scope, element, attrs){
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -5379,7 +5509,7 @@ angular.module('famous.angular')
             });
 
           },
-          post: function(scope, element, attrs){
+          post: function(scope, element, attrs, ctrl, transclude){
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function(clone) {
@@ -5657,7 +5787,7 @@ angular.module('famous.angular')
       restrict: 'E',
       transclude: true,
       scope: true,
-      compile: function(tElem, tAttrs, transclude){
+      compile: function(tElem, tAttrs){
         return  {
           pre: function(scope, element, attrs){
             var isolate = $famousDecorator.ensureIsolate(scope);
@@ -5735,7 +5865,7 @@ angular.module('famous.angular')
             );
 
           },
-          post: function(scope, element, attrs){
+          post: function(scope, element, attrs, ctrl, transclude){
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function(clone) {
@@ -5818,7 +5948,7 @@ angular.module('famous.angular')
       restrict: 'E',
       transclude: true,
       scope: true,
-      compile: function (tElem, tAttrs, transclude) {
+      compile: function (tElem, tAttrs) {
         window.$f = $famous;
         return {
           pre: function (scope, element, attrs) {
@@ -5877,11 +6007,12 @@ angular.module('famous.angular')
                   return _ch;
                 }(_children);
                 _updateSequentialLayout();
-              }
+              },
+              _updateSequentialLayout
             );
 
           },
-          post: function (scope, element, attrs) {
+          post: function (scope, element, attrs, ctrl, transclude) {
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function (clone) {
@@ -6127,10 +6258,10 @@ angular.module('famous.angular')
       transclude: true,
       template: '<div class="fa-surface"></div>',
       restrict: 'EA',
-      compile: function(tElem, tAttrs, transclude){
+      compile: function(tElem, tAttrs){
         return {
           pre: function(scope, element, attrs){
-            
+
             var isolate = $famousDecorator.ensureIsolate(scope);
             // console.log("fa-surface", isolate);
             var Surface = $famous['famous/core/Surface'];
@@ -6151,7 +6282,7 @@ angular.module('famous.angular')
             );
 
             //TODO:  duplicate of fa-image-surface's _propToFaProp function.
-            //       Refactor into a util object/service? 
+            //       Refactor into a util object/service?
             var _propToFaProp = function(prop){
               return "fa" + prop.charAt(0).toUpperCase() + prop.slice(1);
             };
@@ -6185,7 +6316,7 @@ angular.module('famous.angular')
             attrs.$observe('faSize',function () {
               isolate.renderNode.setSize(scope.$eval(attrs.faSize));
               _sizeAnimateTimeStamps.push(new Date());
-              
+
               if(_sizeAnimateTimeStamps.length > 5) {
                 if((_sizeAnimateTimeStamps[4]-_sizeAnimateTimeStamps[0]) <= 1000 ){
                   console.warn("Using fa-size on fa-surface to animate is significantly non-performant, prefer to use fa-size on an fa-modifier surrounding a fa-surface");
@@ -6204,12 +6335,20 @@ angular.module('famous.angular')
             if (attrs.class) {
               isolate.renderNode.setClasses(attrs['class'].split(' '));
             }
-            // Throw an exception if anyother famous scene graph element is added on fa-surface.            
+            if(attrs.faDeploy){
+              isolate.renderNode.on("deploy",function(){
+                var fn = scope[attrs.faDeploy];
+                if(typeof fn === 'function') {
+                  fn(attrs.faDeploy)();
+                }
+              });
+            }
+            // Throw an exception if anyother famous scene graph element is added on fa-surface.
             $famousDecorator.sequenceWith(scope, function(data) {
               throw new Error('Surfaces are leaf nodes of the Famo.us render tree and cannot accept rendernode children.  To include additional Famo.us content inside of a fa-surface, that content must be enclosed in an additional fa-app.');
             });
           },
-          post: function(scope, element, attrs){
+          post: function(scope, element, attrs, ctrl, transclude){
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             var updateContent = function() {
@@ -6868,7 +7007,7 @@ angular.module('famous.angular')
           transclude: true,
           template: '<div class="fa-video-surface"></div>',
           restrict: 'EA',
-          compile: function (tElem, tAttrs, transclude) {
+          compile: function (tElem, tAttrs) {
             return {
               pre: function (scope, element, attrs) {
                 var isolate = $famousDecorator.ensureIsolate(scope);
@@ -6972,7 +7111,7 @@ angular.module('famous.angular')
       transclude: true,
       scope: true,
       restrict: 'EA',
-      compile: function(tElement, tAttrs, transclude){
+      compile: function(tElement, tAttrs){
         var View = $famous['famous/core/View'];
 
         return {
@@ -6993,7 +7132,7 @@ angular.module('famous.angular')
             });
 
           },
-          post: function(scope, element, attrs){
+          post: function(scope, element, attrs, ctrl, transclude){
             var isolate = $famousDecorator.ensureIsolate(scope);
 
             transclude(scope, function(clone) {

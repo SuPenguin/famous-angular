@@ -67,6 +67,7 @@ ngFameApp.provider('$famous', function() {
     "famous/utilities/Timer": famous.utilities.Timer,
     "famous/utilities/Utility": famous.utilities.Utility,
     "famous/views/Deck": famous.views.Deck,
+    "famous/views/DrawerLayout": famous.views.DrawerLayout,
     "famous/views/EdgeSwapper": famous.views.EdgeSwapper,
     "famous/views/FlexibleLayout": famous.views.FlexibleLayout,
     "famous/views/Flipper": famous.views.Flipper,
@@ -186,7 +187,7 @@ ngFameApp.provider('$famous', function() {
   var IS_FA = /^FA\-.*/;
   /**
     Util functions.
-  */ 
+  */
 
   window.$famousUtil = _modules.util = {
     /**
@@ -195,6 +196,7 @@ ngFameApp.provider('$famous', function() {
    * @return {boolean}
    */
     isASurface : function (element) {
+      if(!element[0]) return false;
 
       return IS_A_SURFACE.test(element[0].tagName);
     },
@@ -205,6 +207,8 @@ ngFameApp.provider('$famous', function() {
       @return {boolean}
     */
     isFaElement : function (element) {
+      if(!element[0]) return false;
+
       //short-circuit most common case
       if(IS_FA.test(element[0].tagName)) return true;
 
@@ -244,7 +248,7 @@ ngFameApp.provider('$famous', function() {
         return _modules.util.camelCase(name.replace(PREFIX_REGEXP, ''));
     }
   };
-  
+
   this.$get = function() {
 
     /**
@@ -274,4 +278,3 @@ ngFameApp.provider('$famous', function() {
     return _modules;
   };
 });
-

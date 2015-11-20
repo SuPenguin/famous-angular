@@ -117,7 +117,10 @@ angular.module('famous.angular')
        * considered "enabled" which we do not need.
        */
       var animationHandlers = {
-        enabled: $delegate.enabled
+        enabled: $delegate.enabled,
+        $$removeClassImmediately: $delegate.$$removeClassImmediately,
+        $$addClassImmediately: $delegate.$$addClassImmediately,
+        $$setClassImmediately: $delegate.$$setClassImmediately
       };
 
       angular.forEach(['addClass', 'removeClass'], function(classManipulator) {
@@ -150,7 +153,7 @@ angular.module('famous.angular')
          */
         animationHandlers[classManipulator] = function(element, className, done) {
 
-          $delegate[classManipulator](element, className, done);
+          var promise = $delegate[classManipulator](element, className, done);
           if($famous.util.isFaElement(element)){
             var isolate = _getIsolate(element.scope());
             if ($famous.util.isASurface(element)) {
@@ -180,6 +183,7 @@ angular.module('famous.angular')
               });
             }
           }
+          return promise;
          };
       });
 
@@ -188,7 +192,7 @@ angular.module('famous.angular')
       // and items to remove. Manually loop through both lists.
       animationHandlers.setClass = function(element, add, remove, done) {
 
-        $delegate.setClass(element, add, remove, done);
+        var promise = $delegate.setClass(element, add, remove, done);
 
         if ($famous.util.isASurface(element)) {
           var surface = _getIsolate(element.scope()).renderNode;
@@ -200,6 +204,7 @@ angular.module('famous.angular')
             surface.removeClass(className);
           });
         }
+        return promise;
       };
 
       /**
